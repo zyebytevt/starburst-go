@@ -39,3 +39,8 @@ twitch:
   client_secret: zzzzxxxxwwwwyyyy
   user_id: "9876543210"
 
+
+
+twitch:
+  client_id:
+  client_secret:

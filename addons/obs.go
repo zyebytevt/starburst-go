@@ -1,10 +1,12 @@
 package addons
 
 import (
+	"fmt"
 	"image/color"
-	"strings"
 
-	obsws "github.com/christopher-dG/go-obs-websocket"
+	"github.com/andreykaipov/goobs"
+	"github.com/andreykaipov/goobs/api/events"
+	"github.com/andreykaipov/goobs/api/requests/scenes"
 	"github.com/magicmonkey/go-streamdeck"
 	"github.com/magicmonkey/go-streamdeck/buttons"
 	sddecorators "github.com/magicmonkey/go-streamdeck/decorators"
@@ -13,42 +15,58 @@ import (
 )
 
 type Obs struct {
-	SD         *streamdeck.StreamDeck
-	obs_client obsws.Client
+	obs_client *goobs.Client
+
+	StreamDeck *streamdeck.StreamDeck
 	Offset     int
 }
 
-var obs_current_scene string
+var active_scene_border = sddecorators.NewBorder(5, color.RGBA{255, 0, 0, 255})
+var obs_scene_buttons []*ObsSceneButton
 
-type ObsScene struct {
-	Name     string `mapstructure:"name"`
-	Image    string `mapstructure:"image"`
-	ButtonId int
+type ObsSceneButton struct {
+	SceneName  string `mapstructure:"scene_name"`
+	ButtonText string `mapstructure:"button_text"`
+	Position   int    `mapstructure:"position"`
 }
-
-func (scene *ObsScene) SetButtonId(id int) {
-	scene.ButtonId = id
-}
-
-var buttons_obs map[string]*ObsScene // scene name and image name
 
 func (o *Obs) Init() {
 	o.ConnectOBS()
-	o.ObsEventHandlers()
+
+	go o.obs_client.Listen(func(event any) {
+		switch e := event.(type) {
+		case *events.InputVolumeChanged:
+			log.Debug().Msgf("%s's volume is now %f", e.InputName, e.InputVolumeDb)
+
+		case *events.CurrentProgramSceneChanged:
+			log.Debug().Msgf("Program scene changed event to %s.", e.SceneName)
+			for _, button := range obs_scene_buttons {
+				if button.SceneName == e.SceneName {
+					o.StreamDeck.SetDecorator(button.Position, active_scene_border)
+				} else {
+					o.StreamDeck.UnsetDecorator(button.Position)
+				}
+			}
+		}
+	})
 }
 
 func (o *Obs) ConnectOBS() {
 	log.Debug().Msg("Connecting to OBS...")
-	log.Info().Msgf("%#v\n", viper.Get("obs.host"))
-	o.obs_client = obsws.Client{Host: "localhost", Port: 4444}
-	err := o.obs_client.Connect()
+
+	var err error
+	o.obs_client, err = goobs.New(fmt.Sprintf("%s:%d", viper.GetString("obs.host"), viper.GetInt("obs.port")),
+		goobs.WithPassword(viper.GetString("obs.password")))
+
 	if err != nil {
 		log.Warn().Err(err).Msg("Cannot connect to OBS")
+		panic(err)
 	}
 }
 
+/*
 func (o *Obs) ObsEventHandlers() {
-	if o.obs_client.Connected() == true {
+	if o.obs_client.Connected() {
 		// Scene change
 		o.obs_client.AddEventHandler("SwitchScenes", func(e obsws.Event) {
 			// Make sure to assert the actual event type.
@@ -83,125 +101,106 @@ func (o *Obs) ObsEventHandlers() {
 		})
 
 	}
-}
+}*/
 
-func (o *Obs) Buttons() {
-	if o.obs_client.Connected() == true {
-		// OBS Scenes to Buttons
-		buttons_obs = make(map[string]*ObsScene)
-		viper.UnmarshalKey("obs_scenes", &buttons_obs)
-		image_path := viper.GetString("buttons.images")
-		var image string
+func (o *Obs) CreateButtons() {
+	// OBS Scenes to Buttons
+	obs_scene_buttons = make([]*ObsSceneButton, 0)
+	viper.UnmarshalKey("obs.scenes", &obs_scene_buttons)
 
-		// what scenes do we have? (max 8 for the top row of buttons)
-		scene_req := obsws.NewGetSceneListRequest()
-		scenes, err := scene_req.SendReceive(o.obs_client)
-		if err != nil {
-			log.Warn().Err(err)
-		}
-		obs_current_scene = strings.ToLower(scenes.CurrentScene)
+	scenes, err := o.obs_client.Scenes.GetSceneList()
+	if err != nil {
+		log.Warn().Err(err)
+	}
 
-		// make buttons for these scenes
-		for i, scene := range scenes.Scenes {
-			log.Debug().Msg("Scene: " + scene.Name)
-			image = ""
-			oaction := &OBSSceneAction{Scene: scene.Name, Client: o.obs_client}
-			sceneName := strings.ToLower(scene.Name)
+	// make buttons for these scenes
+	for _, button_info := range obs_scene_buttons {
+		log.Debug().Msg("Scene: " + button_info.SceneName)
+		oaction := &OBSSceneAction{Scene: button_info.SceneName, Obs: o}
+		/*sceneName := strings.ToLower(scene.SceneName)
 
-			if s, ok := buttons_obs[sceneName]; ok {
-				if s.Image != "" {
-					image = image_path + s.Image
-				}
-			} else {
-				// there wasn't an entry in the buttons for this scene so add one
-				buttons_obs[sceneName] = &ObsScene{}
+		if s, ok := buttons_obs[sceneName]; ok {
+			if s.Image != "" {
+				image = filepath.Join(image_path, s.Image)
 			}
+		} else {
+			// there wasn't an entry in the buttons for this scene so add one
+			//buttons_obs[sceneName] = &ObsScene{}
+			log.Warn().Msgf("Button for non-existent %s defined!", sceneName)
+			continue
+		}
 
-			if image != "" {
-				// try to make an image button
+		if image != "" {
+			// try to make an image button
 
+			obutton, err := buttons.NewImageFileButton(image)
+			if err == nil {
+				obutton.SetActionHandler(oaction)
+				o.SD.AddButton(i+o.Offset, obutton)
+				// store which button we just set
+				buttons_obs[sceneName].SetButtonId(i + o.Offset)
+			} else {
+				// something went wrong with the image, use a default one
+				image = image_path + "/play.jpg"
 				obutton, err := buttons.NewImageFileButton(image)
 				if err == nil {
 					obutton.SetActionHandler(oaction)
 					o.SD.AddButton(i+o.Offset, obutton)
 					// store which button we just set
 					buttons_obs[sceneName].SetButtonId(i + o.Offset)
-				} else {
-					// something went wrong with the image, use a default one
-					image = image_path + "/play.jpg"
-					obutton, err := buttons.NewImageFileButton(image)
-					if err == nil {
-						obutton.SetActionHandler(oaction)
-						o.SD.AddButton(i+o.Offset, obutton)
-						// store which button we just set
-						buttons_obs[sceneName].SetButtonId(i + o.Offset)
-					}
 				}
-			} else {
-				// use a text button
-				oopbutton := buttons.NewTextButton(scene.Name)
-				oopbutton.SetActionHandler(oaction)
-				o.SD.AddButton(i+o.Offset, oopbutton)
-				// store which button we just set
-				buttons_obs[sceneName].SetButtonId(i + o.Offset)
 			}
+		} else {
+			// use a text button
+			oopbutton := buttons.NewTextButton(scene.Name)
+			oopbutton.SetActionHandler(oaction)
+			o.SD.AddButton(i+o.Offset, oopbutton)
+			// store which button we just set
+			buttons_obs[sceneName].SetButtonId(i + o.Offset)
+		}*/
 
-			// only need a few scenes
-			if i > 5 {
-				break
-			}
-		}
+		oopbutton := buttons.NewTextButton(button_info.ButtonText)
+		oopbutton.SetActionHandler(oaction)
+		o.StreamDeck.AddButton(button_info.Position, oopbutton)
 
-		// highlight the active scene
-		if eventb, ok := buttons_obs[obs_current_scene]; ok {
-			decorator2 := sddecorators.NewBorder(5, color.RGBA{255, 0, 0, 255})
-			log.Info().Int("button", eventb.ButtonId).Msg("Highlight current scene")
-			o.SD.SetDecorator(eventb.ButtonId, decorator2)
+		if button_info.SceneName == scenes.CurrentProgramSceneName {
+			o.StreamDeck.SetDecorator(button_info.Position, active_scene_border)
 		}
 	}
+
+	// highlight the active scene
+
+	/*if eventb, ok := buttons_obs[scenes.CurrentProgramSceneName]; ok {
+		decorator2 := sddecorators.NewBorder(5, color.RGBA{255, 0, 0, 255})
+		log.Info().Int("button", eventb.ButtonId).Msg("Highlight current scene")
+		o.SD.SetDecorator(eventb.ButtonId, decorator2)
+	}*/
 
 	// show a button to reinitialise all the OBS things
-	startbutton := buttons.NewTextButton("Go OBS")
-	startbutton.SetActionHandler(&OBSStartAction{Client: o.obs_client, Obs: o})
-	o.SD.AddButton(o.Offset+7, startbutton)
+	//startbutton := buttons.NewTextButton("Go OBS")
+	//startbutton.SetActionHandler(&OBSStartAction{Client: o.obs_client, Obs: o})
+	//o.SD.AddButton(o.Offset+7, startbutton)
 }
 
-func (o *Obs) ClearButtons() {
+/*func (o *Obs) ClearButtons() {
 	for i := 0; i < 7; i++ {
-		o.SD.UnsetDecorator(o.Offset + i)
+		o.StreamDeck.UnsetDecorator(o.Offset + i)
 		clearbutton := buttons.NewTextButton("")
-		o.SD.AddButton(o.Offset+i, clearbutton)
+		o.StreamDeck.AddButton(o.Offset+i, clearbutton)
 	}
-}
+}*/
 
 type OBSSceneAction struct {
-	Client obsws.Client
-	Scene  string
-	btn    streamdeck.Button
+	Obs   *Obs
+	Scene string
+	btn   streamdeck.Button
 }
 
 func (action *OBSSceneAction) Pressed(btn streamdeck.Button) {
-
 	log.Info().Msg("Set scene: " + action.Scene)
-	req := obsws.NewSetCurrentSceneRequest(action.Scene)
-	_, err := req.SendReceive(action.Client)
+
+	_, err := action.Obs.obs_client.Scenes.SetCurrentProgramScene(&scenes.SetCurrentProgramSceneParams{SceneName: action.Scene})
 	if err != nil {
-		log.Warn().Err(err).Msg("OBS scene action error")
+		log.Error().Err(err).Msg("Failed to set scene.")
 	}
-
-}
-
-type OBSStartAction struct {
-	Client obsws.Client
-	Obs    *Obs
-	btn    streamdeck.Button
-}
-
-func (action *OBSStartAction) Pressed(btn streamdeck.Button) {
-	log.Debug().Msg("Reinit OBS")
-	if !action.Obs.obs_client.Connected() {
-		action.Obs.Init()
-	}
-	action.Obs.ClearButtons()
-	action.Obs.Buttons()
 }

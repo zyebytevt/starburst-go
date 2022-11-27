@@ -6,12 +6,12 @@ import (
 	"os"
 	"sync"
 
-	"github.com/lornajane/streamdeck-tricks/addons"
 	streamdeck "github.com/magicmonkey/go-streamdeck"
 	_ "github.com/magicmonkey/go-streamdeck/devices"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
+	"github.com/zyebytevt/streaming-backend/addons"
 )
 
 var sd *streamdeck.StreamDeck
@@ -22,9 +22,9 @@ func loadConfigAndDefaults() {
 	// first set some default values
 	viper.AddConfigPath(".")
 	viper.SetDefault("buttons.images", "images/buttons") // location of button images
-	viper.SetDefault("obs.host", "localhost")            // OBS webhooks endpoint
-	viper.SetDefault("obs.port", 4444)                   // OBS webhooks endpoint
-	viper.SetDefault("mqtt.uri", "tcp://10.1.0.1:1883")  // MQTT server location
+
+	viper.SetDefault("obs.host", "localhost") // OBS webhooks endpoint
+	viper.SetDefault("obs.port", 4455)        // OBS webhooks endpoint
 
 	// now read in config for any overrides
 	err := viper.ReadInConfig()
@@ -46,12 +46,17 @@ func main() {
 
 	// init OBS
 	// Initialise OBS to use OBS features (requires websockets plugin in OBS)
-	obs_addon := addons.Obs{SD: sd}
+	obs_addon := addons.Obs{StreamDeck: sd}
 	obs_addon.Init()
-	obs_addon.Buttons()
+	obs_addon.CreateButtons()
+
+	// go Twitch API
+	twitch_addon := addons.Twitch{StreamDeck: sd}
+	twitch_addon.Init()
+	twitch_addon.CreateButtons()
 
 	// init MQTT
-	mqtt_addon := addons.MqttThing{SD: sd}
+	/*mqtt_addon := addons.MqttThing{SD: sd}
 	mqtt_addon.Init()
 	mqtt_addon.Buttons()
 
@@ -70,10 +75,7 @@ func main() {
 	caster_addon.Init()
 	caster_addon.Buttons()
 
-	// go Twitch API
-	twitch_addon := addons.Twitch{SD: sd}
-	twitch_addon.Init()
-	twitch_addon.Buttons()
+
 
 	// Nightbot (needs ngrok twitch if refresh has expired)
 	nightbot_addon := addons.Nightbot{SD: sd}
@@ -83,7 +85,7 @@ func main() {
 	// Mute/Audio features
 	mute_addon := addons.Mute{SD: sd, Button_id: 31}
 	mute_addon.Init()
-	mute_addon.Buttons()
+	mute_addon.Buttons()*/
 
 	go webserver()
 

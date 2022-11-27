@@ -6,11 +6,11 @@ import (
 	"strconv"
 
 	"github.com/hypebeast/go-osc/osc"
-	"github.com/lornajane/streamdeck-tricks/actionhandlers"
 	"github.com/magicmonkey/go-streamdeck"
 	buttons "github.com/magicmonkey/go-streamdeck/buttons"
 	sddecorators "github.com/magicmonkey/go-streamdeck/decorators"
 	"github.com/rs/zerolog/log"
+	"github.com/zyebytevt/streaming-backend/actionhandlers"
 )
 
 type Caster struct {

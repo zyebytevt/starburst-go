@@ -7,14 +7,14 @@ import (
 
 	"github.com/magicmonkey/go-streamdeck"
 	buttons "github.com/magicmonkey/go-streamdeck/buttons"
-	"github.com/nicklaw5/helix"
+	"github.com/nicklaw5/helix/v2"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
 
 type Twitch struct {
-	SD            *streamdeck.StreamDeck
-	twitch_client helix.Client
+	StreamDeck    *streamdeck.StreamDeck
+	twitch_client *helix.Client
 }
 
 func (t *Twitch) Init() {
@@ -27,14 +27,13 @@ func (t *Twitch) Init() {
 	if err != nil {
 		panic(err)
 	}
-	t.twitch_client = *client
+	t.twitch_client = client
 
 	// refresh token valid? Check by trying to use it to get new tokens
 	isValid := t.updateTokens()
 
 	if !isValid {
 		// refresh token outdated or missing, re-auth
-		fmt.Println("Auth to Twitch with URL in browser:")
 		// now set up the auth URL
 		scopes := []string{"user:edit:broadcast"}
 		url := t.twitch_client.GetAuthorizationURL(&helix.AuthorizationURLParams{
@@ -42,12 +41,14 @@ func (t *Twitch) Init() {
 			Scopes:       scopes,
 			ForceVerify:  false,
 		})
-		fmt.Printf("%s\n", url)
+
+		log.Info().Msgf("Auth to Twitch with URL in browser: %s", url)
 	}
 
+	// TODO: Move this to a centralised place, idk
 	// add the HTTP endpoint for the auth callback
 	http.HandleFunc("/auth-callback", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "authed, like truthed")
+		fmt.Fprint(w, "authed, like truthed -Some wise woman 2020")
 
 		code := r.URL.Query().Get("code")
 
@@ -93,17 +94,17 @@ func (t *Twitch) updateTokens() bool {
 	return true
 }
 
-func (t *Twitch) Buttons() {
+func (t *Twitch) CreateButtons() {
 	markbutton := buttons.NewTextButton("Mark")
 	markbutton.SetActionHandler(&TwitchAction{Action: "mark", Client: t.twitch_client, Twitch: t})
-	t.SD.AddButton(23, markbutton)
+	t.StreamDeck.AddButton(23, markbutton)
 	vidbutton := buttons.NewTextButton("Vids")
 	vidbutton.SetActionHandler(&TwitchAction{Action: "videos", Client: t.twitch_client, Twitch: t})
-	t.SD.AddButton(22, vidbutton)
+	t.StreamDeck.AddButton(22, vidbutton)
 }
 
 type TwitchAction struct {
-	Client helix.Client
+	Client *helix.Client
 	Action string
 	Twitch *Twitch
 }
@@ -128,10 +129,15 @@ func (action *TwitchAction) Pressed(btn streamdeck.Button) {
 		fmt.Printf("%#v\n", resp)
 	} else if action.Action == "mark" {
 		// not going to do anything with these responses while I'm streaming
-		resp_mark, _ := action.Client.CreateStreamMarker(&helix.CreateStreamMarkerParams{
+		resp_mark, err := action.Client.CreateStreamMarker(&helix.CreateStreamMarkerParams{
 			UserID:      user_id,
 			Description: "Streamdeck marks the spot",
 		})
-		fmt.Printf("%#v\n", resp_mark)
+
+		if err != nil {
+			log.Warn().Err(err).Msg("Failed to set stream marker.")
+		} else {
+			log.Info().Msgf("Created stream marker at %v.", resp_mark.Data.CreateStreamMarkers[0].CreatedAt)
+		}
 	}
 }
