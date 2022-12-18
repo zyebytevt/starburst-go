@@ -47,18 +47,21 @@ func main() {
 		panic(err)
 	}
 
-	sd.SetBrightness(60) // Create buttons for changing brightness
+	// sd.SetBrightness(60) // Create buttons for changing brightness
 
 	//lib.NewButton(sd, 31, "Sanity!", nil, nil)
 
-	vseeface.Setup(sd)
-	obs.Setup(sd)
-	twitch.Setup(sd)
+	if err := vseeface.Setup(sd); err != nil {
+		logrus.WithError(err).Warning("Failed to initialize VSeeFace addon.")
+	}
 
-	// go Twitch API
-	//twitch_addon := addons.Twitch{StreamDeck: sd}
-	//twitch_addon.Init()
-	//twitch_addon.CreateButtons()
+	if err := obs.Setup(sd); err != nil {
+		logrus.WithError(err).Warning("Failed to initialize OBS addon.")
+	}
+
+	if err := twitch.Setup(sd); err != nil {
+		logrus.WithError(err).Warning("Failed to initialize Twitch addon.")
+	}
 
 	// init MQTT
 	/*mqtt_addon := addons.MqttThing{SD: sd}
@@ -94,7 +97,7 @@ func main() {
 
 	go webserver()
 
-	log.Info().Msg("Up and running")
+	logrus.Info("Up and running!")
 	var wg sync.WaitGroup
 	wg.Add(1)
 	wg.Wait()

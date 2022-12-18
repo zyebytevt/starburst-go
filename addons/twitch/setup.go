@@ -13,36 +13,8 @@ import (
 )
 
 var twitchClient *helix.Client
-var actionCallbacks map[string]func(userData any) = map[string]func(userData any){
-	"set-marker": func(userData any) {
-		isValid, _, _ := twitchClient.ValidateToken(twitchClient.GetUserAccessToken())
-		if !isValid {
-			updateTokens()
-		}
-
-		resp_mark, err := twitchClient.CreateStreamMarker(&helix.CreateStreamMarkerParams{
-			UserID:      viper.GetString("twitch.user_id"),
-			Description: "Streamdeck marks the spot",
-		})
-
-		if err != nil {
-			logrus.WithError(err).Error("Twitch Helix request failed.")
-			return
-		}
-
-		if resp_mark.Error != "" {
-			logrus.WithField("TwitchError", resp_mark.ErrorMessage).Error("Failed to set stream marker.")
-			return
-		}
-
-		logrus.Infof("Created stream marker at %v.", resp_mark.Data.CreateStreamMarkers[0].CreatedAt)
-	},
-}
-
-type ActionConfig struct {
-	ActionName  string `mapstructure:"action_name"`
-	ButtonText  string `mapstructure:"button_text"`
-	ButtonIndex int    `mapstructure:"button_index"`
+var actionCallbacks map[string]lib.ActionCallback = map[string]lib.ActionCallback{
+	"set_marker": setMarkerCallback,
 }
 
 func Setup(streamDeck *streamdeck.StreamDeck) error {
@@ -70,20 +42,15 @@ func Setup(streamDeck *streamdeck.StreamDeck) error {
 		})
 
 		logrus.Infof("Auth to Twitch with URL in browser: %s", url)
-	} else {
-		logrus.WithError(err).Error("Failed to update token.")
 	}
 
-	configs := make([]*ActionConfig, 0)
-	viper.UnmarshalKey("twitch.actions", &configs)
+	configs, err := lib.GetConfigsForKey("twitch.buttons")
+	if err != nil {
+		return err
+	}
 
 	for _, config := range configs {
-		callback, exists := actionCallbacks[config.ActionName]
-		if !exists {
-			logrus.Warningf("Twitch action callback '%s' does not exist.", config.ActionName)
-		}
-
-		lib.NewButton(streamDeck, config.ButtonIndex, config.ButtonText, callback, config)
+		lib.CreateButtonFromConfig(streamDeck, config, actionCallbacks)
 	}
 
 	http.HandleFunc("/auth-callback", func(w http.ResponseWriter, r *http.Request) {

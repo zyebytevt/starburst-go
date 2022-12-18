@@ -7,45 +7,37 @@ import (
 
 	"github.com/magicmonkey/go-streamdeck"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"github.com/zyebytevt/streaming-backend/lib"
 )
 
-type ExpressionConfig struct {
-	KeyName     string `mapstructure:"key"`
-	ButtonText  string `mapstructure:"button_text"`
-	ButtonIndex int    `mapstructure:"button_index"`
-}
-
 var expressionButtons map[string]*lib.Button = make(map[string]*lib.Button)
 
-func Setup(streamDeck *streamdeck.StreamDeck) {
+var actionCallbacks map[string]lib.ActionCallback = map[string]lib.ActionCallback{
+	"set_expression": setExpressionCallback,
+}
+
+func Setup(streamDeck *streamdeck.StreamDeck) error {
 	logrus.Info("Initializing VSeeFace addon...")
 
-	configs := make([]*ExpressionConfig, 0)
-	viper.UnmarshalKey("vseeface.expressions", &configs)
+	configs, err := lib.GetConfigsForKey("vseeface.buttons")
+
+	if err != nil {
+		return err
+	}
 
 	for i, config := range configs {
-		btn := lib.NewButton(streamDeck, config.ButtonIndex, config.ButtonText, func(userData any) {
-			funcConfig := userData.(*ExpressionConfig)
-			if err := sendKeyShortcut(funcConfig.KeyName); err != nil {
-				logrus.WithError(err).Error("Failed to send key to VSeeFace!")
-			} else {
-				for _, button := range expressionButtons {
-					button.SetActive(false)
-				}
+		btn := lib.CreateButtonFromConfig(streamDeck, config, actionCallbacks)
 
-				if button, exists := expressionButtons[funcConfig.KeyName]; exists {
-					button.SetActive(true)
-				}
+		if config.ActionName == "set_expression" {
+			// TODO: Think about this index thingy fix
+			if i == 0 {
+				btn.SetActive(true)
 			}
-		}, config)
-
-		if i == 0 {
-			btn.SetActive(true)
+			expressionButtons[config.Parameters["key"].(string)] = btn
 		}
-		expressionButtons[config.KeyName] = btn
 	}
+
+	return nil
 }
 
 func sendKeyShortcut(key string) error {

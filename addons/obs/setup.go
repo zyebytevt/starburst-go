@@ -5,21 +5,18 @@ import (
 
 	"github.com/andreykaipov/goobs"
 	"github.com/andreykaipov/goobs/api/events"
-	"github.com/andreykaipov/goobs/api/requests/scenes"
 	"github.com/magicmonkey/go-streamdeck"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/zyebytevt/streaming-backend/lib"
 )
 
-type SceneConfig struct {
-	SceneName   string `mapstructure:"scene_name"`
-	ButtonText  string `mapstructure:"button_text"`
-	ButtonIndex int    `mapstructure:"button_index"`
-}
-
 var obsClient *goobs.Client
 var sceneButtons map[string]*lib.Button = make(map[string]*lib.Button)
+
+var actionCallbacks map[string]lib.ActionCallback = map[string]lib.ActionCallback{
+	"set_scene": setSceneCallback,
+}
 
 func Setup(streamDeck *streamdeck.StreamDeck) error {
 	logrus.Info("Initializing OBS addon...")
@@ -33,20 +30,17 @@ func Setup(streamDeck *streamdeck.StreamDeck) error {
 		return err
 	}
 
-	configs := make([]*SceneConfig, 0)
-	viper.UnmarshalKey("obs.scenes", &configs)
+	configs, err := lib.GetConfigsForKey("obs.buttons")
+	if err != nil {
+		return err
+	}
 
 	for _, config := range configs {
-		btn := lib.NewButton(streamDeck, config.ButtonIndex, config.ButtonText, func(userData any) {
-			funcConfig := userData.(*SceneConfig)
+		btn := lib.CreateButtonFromConfig(streamDeck, config, actionCallbacks)
 
-			_, err := obsClient.Scenes.SetCurrentProgramScene(&scenes.SetCurrentProgramSceneParams{SceneName: funcConfig.SceneName})
-			if err != nil {
-				logrus.WithError(err).Error("Failed to set scene!")
-			}
-		}, config)
-
-		sceneButtons[config.SceneName] = btn
+		if config.ActionName == "set_scene" {
+			sceneButtons[config.Parameters["scene_name"].(string)] = btn
+		}
 	}
 
 	currentScene, err := obsClient.Scenes.GetCurrentProgramScene()
