@@ -10,8 +10,11 @@ import (
 	_ "github.com/magicmonkey/go-streamdeck/devices"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"github.com/zyebytevt/streaming-backend/addons"
+	"github.com/zyebytevt/streaming-backend/addons/obs"
+	"github.com/zyebytevt/streaming-backend/addons/twitch"
+	"github.com/zyebytevt/streaming-backend/addons/vseeface"
 )
 
 var sd *streamdeck.StreamDeck
@@ -35,25 +38,27 @@ func loadConfigAndDefaults() {
 
 func main() {
 	loadConfigAndDefaults()
-	log.Info().Msg("Starting streamdeck tricks. Hai!")
+	logrus.Info("Starting the streaming backend. ZyeByte sends her regards.")
 
 	var err error
 	sd, err = streamdeck.New()
 	if err != nil {
-		log.Error().Err(err).Msg("Error finding Streamdeck")
+		logrus.WithError(err).Error("Could not connect to the StreamDeck. Please check connectivity.")
 		panic(err)
 	}
 
-	// init OBS
-	// Initialise OBS to use OBS features (requires websockets plugin in OBS)
-	obs_addon := addons.Obs{StreamDeck: sd}
-	obs_addon.Init()
-	obs_addon.CreateButtons()
+	sd.SetBrightness(60) // Create buttons for changing brightness
+
+	//lib.NewButton(sd, 31, "Sanity!", nil, nil)
+
+	vseeface.Setup(sd)
+	obs.Setup(sd)
+	twitch.Setup(sd)
 
 	// go Twitch API
-	twitch_addon := addons.Twitch{StreamDeck: sd}
-	twitch_addon.Init()
-	twitch_addon.CreateButtons()
+	//twitch_addon := addons.Twitch{StreamDeck: sd}
+	//twitch_addon.Init()
+	//twitch_addon.CreateButtons()
 
 	// init MQTT
 	/*mqtt_addon := addons.MqttThing{SD: sd}

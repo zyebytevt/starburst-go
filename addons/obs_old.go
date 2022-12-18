@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"image/color"
 
+	// "os/exec"
+
 	"github.com/andreykaipov/goobs"
 	"github.com/andreykaipov/goobs/api/events"
 	"github.com/andreykaipov/goobs/api/requests/scenes"
