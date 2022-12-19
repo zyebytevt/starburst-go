@@ -1,15 +1,16 @@
 package lib
 
 import (
+	"fmt"
+
 	"github.com/magicmonkey/go-streamdeck"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
 type ButtonConfig struct {
 	ActionName  string         `mapstructure:"action"`
 	Parameters  map[string]any `mapstructure:"params"`
-	ButtonText  string         `mapstructure:"button_text"`
+	ButtonImage string         `mapstructure:"button_image"`
 	ButtonIndex int            `mapstructure:"button_index"`
 }
 
@@ -20,11 +21,11 @@ func GetConfigsForKey(key string) ([]*ButtonConfig, error) {
 	return configs, err
 }
 
-func CreateButtonFromConfig(streamDeck *streamdeck.StreamDeck, config *ButtonConfig, callbacks map[string]ActionCallback) *Button {
+func CreateButtonFromConfig(streamDeck *streamdeck.StreamDeck, config *ButtonConfig, callbacks map[string]ActionCallback) (*Button, error) {
 	callback, exists := callbacks[config.ActionName]
 	if !exists {
-		logrus.Warningf("Action callback '%s' does not exist.", config.ActionName)
+		return nil, fmt.Errorf("action callback '%s' does not exist", config.ActionName)
 	}
 
-	return NewButton(streamDeck, config.ButtonIndex, config.ButtonText, callback, config)
+	return NewButton(streamDeck, config.ButtonIndex, config.ButtonImage, callback, config)
 }

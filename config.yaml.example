@@ -1,10 +1,68 @@
-streamdeck:
-  -
-    action: set-scene
-    params:
-      scene-name: "Content - Chatting"
-    text: "testest"
-    index: 3
+twitch:
+    buttons:
+        -
+            action: set_marker
+            button_image: "images/buttons/twitch/set_marker.png"
+            button_index: 23
 
-  -
-    action: toggle-stream
+obs:
+    buttons:
+        -
+            action: set_scene
+            params:
+                scene_name: "Main Scene"
+            button_image: "images/buttons/obs/scene_chatting.png"
+            button_index: 0
+
+# Dab GIF
+
+vseeface:
+    buttons:
+        -
+            action: set_expression
+            params:
+                key: F1
+            button_image: "images/buttons/vseeface/expression_neutral.png"
+            button_index: 8
+
+general:
+    buttons:
+        -
+            action: set_brightness
+            params:
+                absolute: true
+                value: 0
+            button_image: "images/buttons/general/brightness_min.png"
+            button_index: 16
+        -
+            action: set_brightness
+            params:
+                absolute: false
+                value: -25
+            button_image: "images/buttons/general/brightness_decrease.png"
+            button_index: 17
+        -
+            action: set_brightness
+            params:
+                absolute: false
+                value: 25
+            button_image: "images/buttons/general/brightness_increase.png"
+            button_index: 18
+        -
+            action: set_brightness
+            params:
+                absolute: true
+                value: 100
+            button_image: "images/buttons/general/brightness_max.png"
+            button_index: 19
+
+dbus:
+    buttons:
+        -
+            action: call
+            params:
+                destination: "org.mpris.MediaPlayer2.vlc"
+                path: "/org/mpris/MediaPlayer2"
+                method: "org.mpris.MediaPlayer2.Player.PlayPause"
+            button_image: "images/buttons/dbus/vlc_play_pause.png"
+            button_index: 5
