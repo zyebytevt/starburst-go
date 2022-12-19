@@ -1,13 +1,15 @@
 package twitch
 
 import (
+	"errors"
+
 	"github.com/nicklaw5/helix/v2"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/zyebytevt/starburst-go/lib"
 )
 
-func setMarkerCallback(button *lib.Button) {
+func setMarkerCallback(button *lib.Button) error {
 	isValid, _, _ := twitchClient.ValidateToken(twitchClient.GetUserAccessToken())
 	if !isValid {
 		updateTokens()
@@ -19,14 +21,13 @@ func setMarkerCallback(button *lib.Button) {
 	})
 
 	if err != nil {
-		logrus.WithError(err).Error("Twitch Helix request failed.")
-		return
+		return err
 	}
 
 	if resp_mark.Error != "" {
-		logrus.WithField("TwitchError", resp_mark.ErrorMessage).Error("Failed to set stream marker.")
-		return
+		return errors.New(resp_mark.ErrorMessage)
 	}
 
 	logrus.Infof("Created stream marker at %v.", resp_mark.Data.CreateStreamMarkers[0].CreatedAt)
+	return nil
 }

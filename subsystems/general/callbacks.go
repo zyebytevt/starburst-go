@@ -6,7 +6,7 @@ import (
 	"github.com/zyebytevt/starburst-go/lib"
 )
 
-func setBrightnessCallback(button *lib.Button) {
+func setBrightnessCallback(button *lib.Button) error {
 	value := button.Config.Parameters["value"].(int)
 
 	if button.Config.Parameters["absolute"].(bool) {
@@ -22,8 +22,10 @@ func setBrightnessCallback(button *lib.Button) {
 	}
 
 	sd.SetBrightness(brightness)
+
+	return nil
 }
 
-func executeCallback(button *lib.Button) {
-	exec.Command(button.Config.Parameters["program"].(string), button.Config.Parameters["cmdline"].(string)).Run()
+func executeCallback(button *lib.Button) error {
+	return exec.Command(button.Config.Parameters["program"].(string), button.Config.Parameters["cmdline"].(string)).Run()
 }

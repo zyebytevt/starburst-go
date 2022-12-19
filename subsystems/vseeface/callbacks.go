@@ -5,10 +5,10 @@ import (
 	"github.com/zyebytevt/starburst-go/lib"
 )
 
-func setExpressionCallback(button *lib.Button) {
+func setExpressionCallback(button *lib.Button) error {
 	// This is a very dirty fix to see if this expression is already set.
 	if button.GetHighlight() != lib.HighlightNone {
-		return
+		return nil
 	}
 
 	button.SetHighlight(lib.HighlightInProgress)
@@ -26,4 +26,6 @@ func setExpressionCallback(button *lib.Button) {
 			button.SetHighlight(lib.HighlightActive)
 		}
 	}
+
+	return nil
 }

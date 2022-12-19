@@ -15,7 +15,8 @@ var obsClient *goobs.Client
 var sceneButtons map[string]*lib.Button = make(map[string]*lib.Button)
 
 var actionCallbacks map[string]lib.ActionCallback = map[string]lib.ActionCallback{
-	"set_scene": setSceneCallback,
+	"set_scene":                setSceneCallback,
+	"toggle_source_visibility": toggleSourceVisibilityCallback,
 }
 
 func Setup(streamDeck *streamdeck.StreamDeck) error {

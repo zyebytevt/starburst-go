@@ -2,9 +2,11 @@ package lib
 
 import (
 	"image/color"
+	"time"
 
 	"github.com/magicmonkey/go-streamdeck"
 	"github.com/magicmonkey/go-streamdeck/buttons"
+	"github.com/sirupsen/logrus"
 
 	sddecorators "github.com/magicmonkey/go-streamdeck/decorators"
 )
@@ -17,10 +19,12 @@ const (
 	HighlightActive
 )
 
-var activeButtonBorder = sddecorators.NewBorder(8, color.RGBA{R: 255, G: 0, B: 0, A: 255})
-var inProgressButtonBorder = sddecorators.NewBorder(6, color.RGBA{R: 255, G: 180, B: 0, A: 255})
+var errorButtonBorder = sddecorators.NewBorder(10, color.RGBA{R: 255, G: 0, B: 0, A: 255})
 
-type ActionCallback func(button *Button)
+var activeButtonBorder = sddecorators.NewBorder(8, color.RGBA{R: 0, G: 255, B: 0, A: 255})
+var inProgressButtonBorder = sddecorators.NewBorder(6, color.RGBA{R: 0, G: 255, B: 150, A: 255})
+
+type ActionCallback func(button *Button) error
 
 type Button struct {
 	streamDeck       *streamdeck.StreamDeck
@@ -54,7 +58,10 @@ func NewButton(streamDeck *streamdeck.StreamDeck, index int, imagePath string, o
 
 func (btn *Button) Pressed(b streamdeck.Button) {
 	if btn.onPressed != nil {
-		btn.onPressed(btn)
+		if err := btn.onPressed(btn); err != nil {
+			go btn.FlashError(5)
+			logrus.WithError(err).Error("Button callback failed with error.")
+		}
 	}
 }
 
@@ -72,4 +79,15 @@ func (btn *Button) SetHighlight(highlight HighlightType) {
 
 func (btn *Button) GetHighlight() HighlightType {
 	return btn.currentHighlight
+}
+
+func (btn *Button) FlashError(count int) {
+	for i := 0; i < count; i++ {
+		btn.streamDeck.UnsetDecorator(btn.index)
+		time.Sleep(time.Millisecond * 150)
+		btn.streamDeck.SetDecorator(btn.index, errorButtonBorder)
+		time.Sleep(time.Millisecond * 150)
+	}
+
+	btn.SetHighlight(btn.currentHighlight)
 }
