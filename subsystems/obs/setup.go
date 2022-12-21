@@ -13,6 +13,7 @@ import (
 
 var obsClient *goobs.Client
 var sceneButtons map[string]*lib.Button = make(map[string]*lib.Button)
+var sourceButtons map[float64]*lib.Button = make(map[float64]*lib.Button)
 
 var actionCallbacks map[string]lib.ActionCallback = map[string]lib.ActionCallback{
 	"set_scene":                setSceneCallback,
@@ -41,12 +42,27 @@ func Setup(streamDeck *streamdeck.StreamDeck) error {
 
 		if config.ActionName == "set_scene" {
 			sceneButtons[config.Parameters["scene_name"].(string)] = btn
+		} else if config.ActionName == "toggle_source_visibility" {
+			id, err := getSceneItemId(config.Parameters["scene_name"].(string), config.Parameters["source_name"].(string))
+
+			if err == nil {
+				sourceButtons[id] = btn
+				btn.UserData["scene_item_id"] = id
+
+				visible, _ := getSceneItemVisibility(config.Parameters["scene_name"].(string), id)
+
+				if visible {
+					btn.SetDecorator(lib.ActiveStateDecorator)
+				}
+			} else {
+				logrus.WithError(err).Error("Failed to set up source button.")
+			}
 		}
 	}
 
 	currentScene, err := obsClient.Scenes.GetCurrentProgramScene()
 	if button, exists := sceneButtons[currentScene.CurrentProgramSceneName]; exists {
-		button.SetHighlight(lib.HighlightActive)
+		button.SetDecorator(lib.ActiveStateDecorator)
 	}
 
 	go obsClient.Listen(obsEventListener)
@@ -63,12 +79,22 @@ func obsEventListener(event any) {
 		logrus.Debugf("Program scene changed event to %s.", e.SceneName)
 
 		for _, button := range sceneButtons {
-			button.SetHighlight(lib.HighlightNone)
+			button.SetDecorator(nil)
 		}
 
 		// TODO: This sometimes causes a nil-pointer access (Segfault), investigate.
 		if button, exists := sceneButtons[e.SceneName]; exists {
-			button.SetHighlight(lib.HighlightActive)
+			button.SetDecorator(lib.ActiveStateDecorator)
+			button.FlashNotify(lib.NotifySuccess)
+		}
+
+	case *events.SceneItemEnableStateChanged:
+		if button, exists := sourceButtons[e.SceneItemId]; exists {
+			if e.SceneItemEnabled {
+				button.SetDecorator(lib.ActiveStateDecorator)
+			} else {
+				button.SetDecorator(nil)
+			}
 		}
 	}
 }

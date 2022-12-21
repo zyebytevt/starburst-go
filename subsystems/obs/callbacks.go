@@ -6,22 +6,17 @@ import (
 )
 
 func setSceneCallback(button *lib.Button) error {
-	button.SetHighlight(lib.HighlightInProgress)
+	button.SetDecorator(lib.InProgressStateDecorator)
 
 	_, err := obsClient.Scenes.SetCurrentProgramScene(&scenes.SetCurrentProgramSceneParams{SceneName: button.Config.Parameters["scene_name"].(string)})
 	return err
 }
 
 func toggleSourceVisibilityCallback(button *lib.Button) error {
-	button.SetHighlight(lib.HighlightInProgress)
+	button.SetDecorator(lib.InProgressStateDecorator)
 
 	sceneName := button.Config.Parameters["scene_name"].(string)
-
-	sceneItemId, err := getSceneItemId(sceneName, button.Config.Parameters["source_name"].(string))
-
-	if err != nil {
-		return err
-	}
+	sceneItemId := button.UserData["scene_item_id"].(float64)
 
 	itemVisible, err := getSceneItemVisibility(sceneName, sceneItemId)
 
@@ -31,13 +26,5 @@ func toggleSourceVisibilityCallback(button *lib.Button) error {
 
 	itemVisible = !itemVisible
 
-	setSceneItemVisibility(sceneName, sceneItemId, itemVisible)
-
-	if itemVisible {
-		button.SetHighlight(lib.HighlightActive)
-	} else {
-		button.SetHighlight(lib.HighlightNone)
-	}
-
-	return nil
+	return setSceneItemVisibility(sceneName, sceneItemId, itemVisible)
 }

@@ -42,7 +42,7 @@ func Setup(streamDeck *streamdeck.StreamDeck) error {
 		if config.ActionName == "set_expression" {
 			// TODO: Think about this index thingy fix
 			if firstExpressionButton {
-				btn.SetHighlight(lib.HighlightActive)
+				btn.SetDecorator(lib.ActiveStateDecorator)
 				firstExpressionButton = false
 			}
 			expressionButtons[config.Parameters["key"].(string)] = btn

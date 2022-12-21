@@ -28,6 +28,7 @@ func setMarkerCallback(button *lib.Button) error {
 		return errors.New(resp_mark.ErrorMessage)
 	}
 
+	button.FlashNotify(lib.NotifySuccess)
 	logrus.Infof("Created stream marker at %v.", resp_mark.Data.CreateStreamMarkers[0].CreatedAt)
 	return nil
 }

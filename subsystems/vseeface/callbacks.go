@@ -7,11 +7,11 @@ import (
 
 func setExpressionCallback(button *lib.Button) error {
 	// This is a very dirty fix to see if this expression is already set.
-	if button.GetHighlight() != lib.HighlightNone {
+	if button.GetDecorator() != nil {
 		return nil
 	}
 
-	button.SetHighlight(lib.HighlightInProgress)
+	button.SetDecorator(lib.InProgressStateDecorator)
 
 	keyName := button.Config.Parameters["key"].(string)
 
@@ -19,11 +19,12 @@ func setExpressionCallback(button *lib.Button) error {
 		logrus.WithError(err).Error("Failed to send key to VSeeFace!")
 	} else {
 		for _, button := range expressionButtons {
-			button.SetHighlight(lib.HighlightNone)
+			button.SetDecorator(nil)
 		}
 
 		if button, exists := expressionButtons[keyName]; exists {
-			button.SetHighlight(lib.HighlightActive)
+			button.SetDecorator(lib.ActiveStateDecorator)
+			button.FlashNotify(lib.NotifySuccess)
 		}
 	}
 
